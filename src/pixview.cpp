@@ -20,37 +20,79 @@ namespace fs=boost::filesystem;
 /*
  * all the operations are done with cairo, then blit into sdl surface.
  * This class is also a singlton as we are doing SDL initialization with it.
+ * The main function of this class is changing image size
  */
 class RenderCore {
 private:
+	Image origin; //this is the origin image, without scale
 	cairo_surface_t *_image;
-	Blob _blob;
-//	_origin;
+	unsigned int _w, _h; //max,
+	float _ratio; //current ratio for image to show image
+
+	float _pixelsize;
 public:
-	RenderCore(void);
+	RenderCore(int maxw, int maxh);
 //	RenderCore(const char *imageloc);
 	bool loadImg(const char *imageloc);
 	SDL_Surface *output2SDL(void);
+
+	//adapt image and window, this function is
+	//used at the beginning of creating image, since we have
+	//a limitation of windows size
+	float adapt4window(unsigned int w, unsigned int h);
+	//there are other cases when we need to change image size.
+	Image scalebyRatio(float ratio);
+//	Image scalebyPixSize(int pixsize);
+//	SDL_Surface *scale(int pixelsizeinc);
 };
 
 
-RenderCore::RenderCore(void) :
-	_image(NULL)
-{}
+RenderCore::RenderCore(int maxw, int maxh) :
+	_image(NULL), _w(maxw), _h(maxh)
+{
+	_pixelsize = 1;
+}
+
+float
+RenderCore::adapt4window(unsigned int w, unsigned int h)
+{
+	//this will also change the
+	float ratiow, ratioh, ratio;
+	ratiow = (w < origin.columns()) ? (float)w / (float) origin.columns() : 1;
+	ratioh = (h < origin.rows()) ? (float)h / (float) origin.rows() : 1;
+	ratio = std::min(ratiow, ratioh);
+	return ratio;
+}
+
+//downscale, use the full image
+Image
+RenderCore::scalebyRatio(float ratio)
+{
+	Image second = origin;
+	int rows, cols;
+	
+	rows = ratio * origin.rows(); cols = ratio * origin.columns();
+	second.scale(Geometry(cols, rows));
+	return second;
+}
 
 //we will have sdl code here
 bool
 RenderCore::loadImg(const char *imageloc)
 {
+	Image second;
 	//you need to clean up previous image as well.
-	Image origin;
 	origin.read(std::string(imageloc));
-	origin.magick("PNG");
-	origin.write(&_blob);
 	if (_image)
 		cairo_surface_destroy(_image);
-	_image = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, origin.columns(), origin.rows());
-	origin.write(0, 0, origin.columns(), origin.rows(),
+
+	//scale image when necessary
+
+	_ratio = adapt4window(_w, _h);
+	second = scalebyRatio(_ratio);
+
+	_image = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, second.columns(), second.rows());
+	second.write(0, 0, second.columns(), second.rows(),
 		     "RGBA", Magick::CharPixel,
 		     cairo_image_surface_get_data(_image));
 	return true;
@@ -74,6 +116,7 @@ RenderCore::output2SDL(void)
 	bmask = 0x00ff0000;
 	amask = 0xff000000;
 #endif
+	//FIXME I am not sure what will happen if the sdl_surface here created get freed outside
 	return SDL_CreateRGBSurfaceFrom((void *)cairo_image_surface_get_data(_image),
 					width, height,
 					32,
@@ -89,9 +132,6 @@ static int MAIN_PID = -1;
 static int
 get_images_in_dir(const std::string& img, std::vector<std::string>& imgs)
 {
-	const char *mime;
-	//magic_t magic;
-	
 	imgs.clear();
 	if (!fs::path(img).is_absolute())
 	return -1;
@@ -144,7 +184,7 @@ get_prevnext_img(const std::vector<std::string>& files, int offset, int directio
 
 int main(int argc, char **argv)
 {
-	int offset;
+	int offset, maxw, maxh;
 	bool shouldquit = false;
 	std::string absimg_path;
 	std::vector<std::string> imgs;
@@ -158,7 +198,7 @@ int main(int argc, char **argv)
 		std::cerr << "Invalid image: " << argv[1] << std::endl;
 		return -1;
 	}
-	int width, height;
+//	int width, height;
 	SDL_Window *win;
 	SDL_Surface *win_surf;
 	SDL_Surface *image;
@@ -166,8 +206,19 @@ int main(int argc, char **argv)
 	if (SDL_Init( SDL_INIT_VIDEO) == -1)
 		return -1;
 	
+	for (int i = 0; i < SDL_GetNumVideoDisplays(); i++) {
+		SDL_DisplayMode current;
+		
+		int shouldbezero = SDL_GetCurrentDisplayMode(i, &current);
+		if (shouldbezero)
+			return -1;
+		maxw = current.w * 0.6;
+		maxh = current.h * 0.6;
+		break;
+	}
+	
 	//prepare everything before we show windows.
-	RenderCore render;
+	RenderCore render(maxw, maxh);
 	render.loadImg(absimg_path.c_str());
 	image = render.output2SDL();
 	if ((win = SDL_CreateWindow(argv[1],
@@ -180,9 +231,17 @@ int main(int argc, char **argv)
 	}
 	//show
 	win_surf = SDL_GetWindowSurface(win);
+	SDL_BlitSurface(image, NULL, win_surf, NULL);
+	
 	SDL_Event event;
-	//this should be the main thread
-	while (!shouldquit) {
+	SDL_Rect srcRect = {
+		.x = 0,
+		.y = 0,
+	};			
+	
+	//so this is actually the origin of image 
+	while (!shouldquit) { 
+		//TODO: fix 100% cpu occupy
 		while(SDL_PollEvent(&event)) {
 			//so yes, right now we need to
 			if (event.type == SDL_QUIT)
@@ -198,6 +257,8 @@ int main(int argc, char **argv)
 					SDL_SetWindowSize(win, image->w, image->h);
 					SDL_FreeSurface(win_surf);
 					win_surf = SDL_GetWindowSurface(win);
+					SDL_BlitSurface(image, NULL, win_surf, NULL);
+					srcRect.x = srcRect.y = 0;
 					break;
 				case SDLK_RIGHT:
 					std::cout << "right key pressed" << std::endl;					
@@ -208,15 +269,42 @@ int main(int argc, char **argv)
 					SDL_SetWindowSize(win, image->w, image->h);
 					SDL_FreeSurface(win_surf);
 					win_surf = SDL_GetWindowSurface(win);
+					SDL_BlitSurface(image, NULL, win_surf, NULL);
+					srcRect.x = srcRect.y = 0;
 					break;
 				}
 				//you have to get previous or next image
-			} else if (event.type == SDL_MOUSEMOTION && event.motion.state == SDL_PRESSED) {
-				std::cout << "mouse are moving" << std::endl;
-			} else if (event.type == SDL_MOUSEWHEEL)
+			} else if (event.type == SDL_MOUSEMOTION) {
+				bool outofbound = false;
+				int w, h;
+				int posx, posy;
+
+				
+				SDL_GetWindowSize(win, &w, &h);
+				posx = event.motion.x; posy = event.motion.y;
+				outofbound = outofbound | (posx < 0 || posx > w);
+				outofbound = outofbound | (posy < 0 || posy > h);
+				if (event.motion.state != SDL_PRESSED || outofbound)
+					continue;
+//				std::cout << "before moving" << destRect.x << " " << destRect.y << std::endl;
+//				destRect.x += event.motion.xrel;
+//				destRect.y += event.motion.yrel;
+//				destRect.w = image->w; destRect.h = image->h;
+				srcRect.x -= event.motion.xrel;
+				srcRect.y -= event.motion.yrel;
+				srcRect.w = image->w; srcRect.h = image->h;
+//				srcRect.x = std::max(srcRect.x, 0);				
+//				srcRect.y = std::max(srcRect.y, 0);
+				//sdl does clipping, so you need to use srcRect,
+//				std::cout << "after moving " << srcRect.x << " " << srcRect.y << std::endl;
+				SDL_FillRect(win_surf, NULL, 0x000000);
+				SDL_BlitSurface(image, &srcRect, win_surf, NULL);
+			} else if (event.type == SDL_MOUSEWHEEL) {
 				std::cout << "wheel moving x: " << event.wheel.x << "and y: " << event.wheel.y << std::endl;
+			}
+
 		}
-		SDL_BlitSurface(image, NULL, win_surf, NULL);
+
 		SDL_UpdateWindowSurface(win);
 	}
 	SDL_FreeSurface(image);
