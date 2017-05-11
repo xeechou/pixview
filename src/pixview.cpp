@@ -124,6 +124,7 @@ static std::string get_abs_path(const char* img_path)
 int main(int argc, char **argv)
 {
 	int offset;
+	bool shouldquit = false;
 	std::string absimg_path;
 	std::vector<std::string> imgs;
 	MAIN_PID = getpid();
@@ -151,7 +152,7 @@ int main(int argc, char **argv)
 	//prepare everything before we show windows.
 	RenderCore render;
 	render.loadImg(argv[1]);
-	image = render.output2SDL();	
+	image = render.output2SDL();
 //	cairo_image_surface_create_for_data(image->pixels, CAIRO_FORMAT_RGB24, image->w, image->h, image->pitch);
 	if ((win = SDL_CreateWindow(argv[1],
 				    SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
@@ -163,34 +164,32 @@ int main(int argc, char **argv)
 	}
 	//show
 	win_surf = SDL_GetWindowSurface(win);
-	SDL_BlitSurface(image, NULL, win_surf, NULL);
-	SDL_UpdateWindowSurface(win);
-	SDL_Delay(2000);
-	return 0;
-//	for_cairo = SDL_ConvertSurface(image, win_surf->format, 0);
-//	SDL_FreeSurface(image);
-	//so it looks like you always have a at least two surface, then use blitsurface to copy to the window surface	
-//	SDL_BlitSurface(for_cairo, NULL, win_surf, NULL);
-//	SDL_UpdateWindowSurface(win);
-//	SDL_Delay(2000);
 
-	//then you destroy the surface
-//	SDL_FreeSurface(for_cairo);
-//	SDL_FreeSurface(win_surf);
-//	SDL_DestroyWindow(win);
-//	for_cairo = SDL_ConvertSurface(SDL_Surface *src, const SDL_PixelFormat *fmt, Uint32 flags)
-//	while(1);
-		
-
-//	sdlsurf = 
-	
-//	SDL_DisplayMode current;
-//	for (int i = 0; i < SDL_GetNumVideoDisplays(); i++) {
-//		int should_be_zero = SDL_GetCurrentDisplayMode(i, &current);
-//	}
-	
-	//create a surface from a png file
-
-	//cr = cairo_create(surface);
-//	image_indexer.join();
+	SDL_Event event;
+//	uint8_t scancode;
+//	SDL_Keysym
+	while (!shouldquit) {
+		while(SDL_PollEvent(&event)) {
+			if (event.type == SDL_QUIT)
+				shouldquit = true;
+			else if (event.type == SDL_KEYUP) {
+				switch (event.key.keysym.sym) {
+				case SDLK_LEFT:
+					std::cout << "left key pressed" << std::endl;
+					break;
+				case SDLK_RIGHT:
+					std::cout << "right key pressed" << std::endl;
+					break;
+				}
+				//you have to get previous or next image
+			} else if (event.type == SDL_MOUSEMOTION && event.motion.state == SDL_PRESSED) {
+				std::cout << "mouse are moving" << std::endl;
+				
+			} else if (event.type == SDL_MOUSEWHEEL)
+				std::cout << "wheel moving x: " << event.wheel.x << "and y: " << event.wheel.y << std::endl;
+		}
+		SDL_BlitSurface(image, NULL, win_surf, NULL);
+		SDL_UpdateWindowSurface(win);
+	}
+	return 0;	
 }
