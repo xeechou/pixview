@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
+//#include <SDL2/SDL_image.h>
 #include <cairo/cairo.h>
 
 #include <iostream>
@@ -144,10 +144,10 @@ int main(int argc, char **argv)
 
 	if (SDL_Init( SDL_INIT_VIDEO) == -1)
 		return -1;
-	if ( !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) ) {
-		perror("failed to init png routine\n");
-		return -1;
-	}
+//	if ( !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) ) {
+//		perror("failed to init png routine\n");
+//		return -1;
+//	}
 	
 	//prepare everything before we show windows.
 	RenderCore render;
