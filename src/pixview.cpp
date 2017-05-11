@@ -36,8 +36,7 @@ public:
 
 RenderCore::RenderCore(void) :
 	_image(NULL)
-{
-}
+{}
 
 //we will have sdl code here
 bool
@@ -69,7 +68,7 @@ RenderCore::output2SDL(void)
 	gmask = 0x00ff0000;
 	bmask = 0x0000ff00;
 	amask = 0x000000ff;
-	#else
+#else
 	rmask = 0x000000ff;
 	gmask = 0x0000ff00;
 	bmask = 0x00ff0000;
@@ -108,7 +107,8 @@ get_images_in_dir(const std::string& img, std::vector<std::string>& imgs)
 	return std::distance(imgs.begin(), std::find(imgs.begin(), imgs.end(), img));
 }
 
-static std::string get_abs_path(const char* img_path)
+static std::string
+get_abs_path(const char* img_path)
 {
 	const char *current_path;
 	fs::path p(img_path);
@@ -120,6 +120,27 @@ static std::string get_abs_path(const char* img_path)
 		return (fs::path(getenv("PWD")) / p.filename()).string();
 }
 
+static int
+get_prevnext_img(const std::vector<std::string>& files, int offset, int direction)
+{
+	Image toload;
+	bool foundimage = false;
+	while (!foundimage) {
+		offset += direction;
+		if (offset < 0)
+			offset += files.size();
+		else if (offset >= files.size())
+			offset -= files.size();
+		try {
+			toload.ping(files[offset]);
+		} catch (std::exception & error) {
+			//okay, this is not a image.
+			continue;
+		}
+		foundimage = true;
+	}
+	return offset;
+}
 
 int main(int argc, char **argv)
 {
@@ -144,16 +165,11 @@ int main(int argc, char **argv)
 
 	if (SDL_Init( SDL_INIT_VIDEO) == -1)
 		return -1;
-//	if ( !(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) ) {
-//		perror("failed to init png routine\n");
-//		return -1;
-//	}
 	
 	//prepare everything before we show windows.
 	RenderCore render;
-	render.loadImg(argv[1]);
+	render.loadImg(absimg_path.c_str());
 	image = render.output2SDL();
-//	cairo_image_surface_create_for_data(image->pixels, CAIRO_FORMAT_RGB24, image->w, image->h, image->pitch);
 	if ((win = SDL_CreateWindow(argv[1],
 				    SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 				    image->w, image->h,
@@ -164,32 +180,46 @@ int main(int argc, char **argv)
 	}
 	//show
 	win_surf = SDL_GetWindowSurface(win);
-
 	SDL_Event event;
-//	uint8_t scancode;
-//	SDL_Keysym
+	//this should be the main thread
 	while (!shouldquit) {
 		while(SDL_PollEvent(&event)) {
+			//so yes, right now we need to
 			if (event.type == SDL_QUIT)
 				shouldquit = true;
 			else if (event.type == SDL_KEYUP) {
 				switch (event.key.keysym.sym) {
 				case SDLK_LEFT:
 					std::cout << "left key pressed" << std::endl;
+					offset = get_prevnext_img(imgs, offset, -1);
+					render.loadImg(imgs[offset].c_str());
+					SDL_FreeSurface(image);
+					image = render.output2SDL();
+					SDL_SetWindowSize(win, image->w, image->h);
+					SDL_FreeSurface(win_surf);
+					win_surf = SDL_GetWindowSurface(win);
 					break;
 				case SDLK_RIGHT:
-					std::cout << "right key pressed" << std::endl;
+					std::cout << "right key pressed" << std::endl;					
+					offset = get_prevnext_img(imgs, offset, 1);
+					render.loadImg(imgs[offset].c_str());
+					SDL_FreeSurface(image);
+					image = render.output2SDL();
+					SDL_SetWindowSize(win, image->w, image->h);
+					SDL_FreeSurface(win_surf);
+					win_surf = SDL_GetWindowSurface(win);
 					break;
 				}
 				//you have to get previous or next image
 			} else if (event.type == SDL_MOUSEMOTION && event.motion.state == SDL_PRESSED) {
 				std::cout << "mouse are moving" << std::endl;
-				
 			} else if (event.type == SDL_MOUSEWHEEL)
 				std::cout << "wheel moving x: " << event.wheel.x << "and y: " << event.wheel.y << std::endl;
 		}
 		SDL_BlitSurface(image, NULL, win_surf, NULL);
 		SDL_UpdateWindowSurface(win);
 	}
+	SDL_FreeSurface(image);
+	SDL_FreeSurface(win_surf);
 	return 0;	
 }
