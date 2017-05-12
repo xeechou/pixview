@@ -23,6 +23,7 @@ namespace fs=boost::filesystem;
  * The main function of this class is changing image size
  */
 class RenderCore {
+	//you need to define the pixel size to draw 
 private:
 	Image origin; //this is the origin image, without scale
 	cairo_surface_t *_image;
@@ -43,7 +44,7 @@ public:
 	//there are other cases when we need to change image size.
 	Image scalebyRatio(float ratio);
 //	Image scalebyPixSize(int pixsize);
-//	SDL_Surface *scale(int pixelsizeinc);
+	SDL_Surface *scale(int pixelsizeinc, size_t winsize);
 };
 
 
@@ -76,6 +77,11 @@ RenderCore::scalebyRatio(float ratio)
 	return second;
 }
 
+SDL_Surface *
+RenderCore::scale(int pixelsizeinc)
+{
+	if (std::min(pixelsizeinc))
+}
 //we will have sdl code here
 bool
 RenderCore::loadImg(const char *imageloc)
