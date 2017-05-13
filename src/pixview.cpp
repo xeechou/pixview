@@ -30,12 +30,48 @@ private:
 	unsigned int _w, _h; //max,
 	float _ratio; //current ratio for image to show image
 
-	float _pixelsize;
+	int _pxratio_exp;
 public:
+	class ImageGeo {
+	public:
+		int _x, _y;  //image origin offset regards to window
+		int _cx, _cy; //the current center of that image
+		unsigned int _w, _h; //size of the window
+		unsigned int _imw, _imh;
+		ImageGeo(unsigned int x,  unsigned int y,
+			 unsigned int wx, unsigned int wy,
+			 unsigned int w,  unsigned int h,
+			 unsigned int imw, unsigned int imh) :
+			_w(w), _h(h), _imw(imw), _imh(imh) {
+			_x = x; _y = y;
+			//translation from window coordinates to image coordinates
+			_cx = wx - x; _cy = wy - y;
+		}
+		bool outofbound(void) const {
+			return (_cx < 0 || _cx > (int)_imw || _cy < 0 || _cy > (int)_imh);
+		}
+	};
+	class point2_t {
+	public:
+		float x, y;
+		point2_t(float x, float y) {this->x = x; this->y = y;}
+		point2_t operator+(const point2_t& another) {
+			return point2_t(this->x + another.x, this->y + another.y);
+		}
+		point2_t& operator*=(const float scale) {
+			x *= scale;
+			y *= scale;
+//			w *= scale; h *= scale;
+			return *this;
+		}
+	};
 	RenderCore(int maxw, int maxh);
 //	RenderCore(const char *imageloc);
 	bool loadImg(const char *imageloc);
 	SDL_Surface *output2SDL(void);
+	void set2cairo(Image& img);
+	
+	Geometry intersect(const point2_t& orig, const point2_t& wh);
 
 	//adapt image and window, this function is
 	//used at the beginning of creating image, since we have
@@ -44,14 +80,14 @@ public:
 	//there are other cases when we need to change image size.
 	Image scalebyRatio(float ratio);
 //	Image scalebyPixSize(int pixsize);
-	SDL_Surface *scale(int pixelsizeinc, size_t winsize);
+	SDL_Surface *scale(int pixelsizeinc, const ImageGeo& geo);
 };
 
 
 RenderCore::RenderCore(int maxw, int maxh) :
 	_image(NULL), _w(maxw), _h(maxh)
 {
-	_pixelsize = 1;
+	_pxratio_exp = 0;
 }
 
 float
@@ -76,11 +112,46 @@ RenderCore::scalebyRatio(float ratio)
 	second.scale(Geometry(cols, rows));
 	return second;
 }
+void RenderCore::set2cairo(Image& cropped)
+{
+	if (_image)
+		cairo_surface_destroy(_image);
+	_image = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, cropped.columns(), cropped.rows());
+	cropped.write(0,0,cropped.columns(), cropped.rows(), "RGBA", Magick::CharPixel, cairo_image_surface_get_data(_image));
+}
 
 SDL_Surface *
-RenderCore::scale(int pixelsizeinc)
+RenderCore::scale(int ratio_inc, const ImageGeo& geo)
 {
-	if (std::min(pixelsizeinc))
+	if (geo.outofbound())
+		return  output2SDL();
+	//so the algorithm goes like this: we need to find the part of image
+	//that actually worth scaling, we crop that area then thransfer it back.
+	
+	//now, get the scale
+	_pxratio_exp += ratio_inc;
+	int sign = (_pxratio_exp > 0) - (_pxratio_exp < 0);
+	float scale = std::pow(1 + sign * 0.1, std::abs(_pxratio_exp));
+
+	//translate window to center of scale
+	point2_t win_origin(-geo._cx + geo._x, -geo._cy + geo._y);
+	point2_t wh(geo._w, geo._h);
+	
+	//scale
+	win_origin *= 1.0 / scale;
+	wh *= 1.0 / scale;
+	//translate to origin of image
+	win_origin.x -= geo._x; win_origin.y -= geo._y;
+	wh.x -= geo._x; wh.y -= geo._y;
+	//intersect 
+	Geometry tocrop = intersect(win_origin, wh);
+	Image cropped = origin;
+	cropped.crop(tocrop);
+	cropped.scale(Geometry(cropped.columns() * scale, cropped.rows() * scale));
+	set2cairo(cropped);
+	//relocate your src rect
+	struct SDL_Rect srcRect;
+			
 }
 //we will have sdl code here
 bool
@@ -89,18 +160,12 @@ RenderCore::loadImg(const char *imageloc)
 	Image second;
 	//you need to clean up previous image as well.
 	origin.read(std::string(imageloc));
-	if (_image)
-		cairo_surface_destroy(_image);
 
 	//scale image when necessary
 
 	_ratio = adapt4window(_w, _h);
 	second = scalebyRatio(_ratio);
-
-	_image = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, second.columns(), second.rows());
-	second.write(0, 0, second.columns(), second.rows(),
-		     "RGBA", Magick::CharPixel,
-		     cairo_image_surface_get_data(_image));
+	set2cairo(second);
 	return true;
 }
 
