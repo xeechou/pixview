@@ -1,0 +1,21 @@
+* Pixview, an image viewer that you can exam pixel values
+
+  Library used are SDL, cairo and GraphicMagick++
+* Features[50%]
+** DONE browsing all images in the folder
+** DONE choose the right window size
+** DONE dragging
+   When you use ~SDL_blitSurface~, it will alter the ~DestRect~ to make it non
+   negative, the simple solution is using ~SrcRect~ instead, the ~srcRect~ can
+   go to negative without problem
+** DOIN zooming in/out
+   This is I guess the most difficult, the main problem is that you need to crop
+   part of them image, then scale them. The problem is it is very slow, wait!!!
+   Is it true?
+   1. find out the part of image to zoom
+   2. crop that part
+   3. Then on the other hand of your program, you need to update your location
+      back to right location
+** TODO print pixel value
+** TODO Multi-thread
+** TODO add foot note, where you can exam pixel value.
