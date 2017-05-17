@@ -2,7 +2,9 @@ include_directories(${Magick++_INCLUDE_DIRS})
 include_directories(${CAIRO_INCLUDE_DIR})
 include_directories(${SDL2_INCLUDE_DIR})
 
-add_executable(pixview pixview.cpp)
+add_executable(pixview
+  render.cpp
+  pixview.cpp)
 
 target_link_libraries(pixview
   ${CAIRO_LIBRARIES}
