@@ -137,6 +137,8 @@ int main(int argc, char **argv)
 	};			
 	int w, h;
 	int posx, posy;
+	SDL_GetWindowSize(win, &w, &h);	
+	ImageGeo2 geo2(point2_t(w, h), render.getImgSize());
 	
 	while (!shouldquit) {
 		//TODO: fix 100% cpu occupy
@@ -177,10 +179,13 @@ int main(int argc, char **argv)
 				
 				SDL_GetWindowSize(win, &w, &h);
 				posx = event.motion.x; posy = event.motion.y;
+				geo2.setImgCent(posx, posy);
 				outofbound = outofbound | (posx < 0 || posx > w);
 				outofbound = outofbound | (posy < 0 || posy > h);
 				if (event.motion.state != SDL_PRESSED || outofbound)
 					continue;
+				geo2.shitft(event.motion.xrel, event.motion.yrel);
+//				srcRect = geo2
 //				destRect.x += event.motion.xrel;
 //				destRect.y += event.motion.yrel;
 //				destRect.w = image->w; destRect.h = image->h;
@@ -194,15 +199,16 @@ int main(int argc, char **argv)
 				SDL_FillRect(win_surf, NULL, 0x000000);
 				SDL_BlitSurface(image, &srcRect, win_surf, NULL);
 			} else if (event.type == SDL_MOUSEWHEEL) {
-				ImageGeo geo(-srcRect.x, -srcRect.y, posx, posy, w, h);
+//				ImageGeo geo(-srcRect.x, -srcRect.y, posx, posy, w, h);
 				if (image)
 					SDL_FreeSurface(image);
-				image = render.scale_slow((event.wheel.y * -1) < 0 ? 1: -1,
-							  geo);
+				image = render.scale((event.wheel.y * -1 < 0) ? 1 : -1,  geo2);
+//				image = render.scale_slow((event.wheel.y * -1) < 0 ? 1: -1,
+//							  geo);
 				//okay, the srcRect is not currect. gonna fix it
-				std::cout << srcRect.x << " beforesrcRect " << srcRect.y << std::endl;
-				srcRect = geo.cast2srcRect();
-				std::cout << srcRect.x << " srcRect " << srcRect.y << std::endl << std::endl;
+//				std::cout << srcRect.x << " beforesrcRect " << srcRect.y << std::endl;
+				srcRect = geo2.cast2SrcRect();
+//				std::cout << srcRect.x << " srcRect " << srcRect.y << std::endl << std::endl;
 				SDL_FillRect(win_surf, NULL, 0x000000);
 				SDL_BlitSurface(image, &srcRect, win_surf, NULL);
 //				std::cout << "wheel moving x: " << event.wheel.x << "and y: " << event.wheel.y << std::endl;

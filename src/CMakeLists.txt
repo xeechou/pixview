@@ -4,7 +4,8 @@ include_directories(${SDL2_INCLUDE_DIR})
 
 add_executable(pixview
   render.cpp
-  pixview.cpp)
+  pixview.cpp
+  geo.cpp)
 
 target_link_libraries(pixview
   ${CAIRO_LIBRARIES}
