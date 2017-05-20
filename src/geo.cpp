@@ -36,6 +36,8 @@ ImageGeo2::cast2SrcRect(void) {
 	//translate to the crop space;
 	new_cx -= crop_begin.x * scale;
 	new_cy -= crop_begin.y * scale;
+	std::cout << "crop_begin: " << crop_begin.x << " " << crop_begin.y << std::endl;
+	std::cout << "compare of wx and x " << _wcx << " " << _cx << std::endl;
 		
 	//moving from center to the origin
 	destX = new_cx - _wcx;

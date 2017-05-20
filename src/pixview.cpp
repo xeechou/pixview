@@ -159,6 +159,7 @@ int main(int argc, char **argv)
 					win_surf = SDL_GetWindowSurface(win);
 					SDL_BlitSurface(image, NULL, win_surf, NULL);
 					srcRect.x = srcRect.y = 0;
+					geo2.scale = 1;
 					break;
 				case SDLK_RIGHT:
 					std::cout << "right key pressed" << std::endl;					
@@ -171,6 +172,7 @@ int main(int argc, char **argv)
 					win_surf = SDL_GetWindowSurface(win);
 					SDL_BlitSurface(image, NULL, win_surf, NULL);
 					srcRect.x = srcRect.y = 0;
+					geo2.scale = 1;
 					break;
 				}
 				//you have to get previous or next image
@@ -202,12 +204,14 @@ int main(int argc, char **argv)
 //				ImageGeo geo(-srcRect.x, -srcRect.y, posx, posy, w, h);
 				if (image)
 					SDL_FreeSurface(image);
+
 				image = render.scale((event.wheel.y * -1 < 0) ? 1 : -1,  geo2);
-//				image = render.scale_slow((event.wheel.y * -1) < 0 ? 1: -1,
-//							  geo);
 				//okay, the srcRect is not currect. gonna fix it
 //				std::cout << srcRect.x << " beforesrcRect " << srcRect.y << std::endl;
+
+
 				srcRect = geo2.cast2SrcRect();
+				geo2.setImgCent(posx, posy);							
 //				std::cout << srcRect.x << " srcRect " << srcRect.y << std::endl << std::endl;
 				SDL_FillRect(win_surf, NULL, 0x000000);
 				SDL_BlitSurface(image, &srcRect, win_surf, NULL);
